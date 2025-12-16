@@ -6,7 +6,7 @@
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
-![Homey Self-Hosted Server screenshot](images/Homey Self-Hosted Server.png)
+![Homey Self-Hosted Server screenshot](images/Homey%20Self-Hosted%20Server.png)
 
 Run Homey Self-Hosted Server as a Home Assistant add-on.
 
