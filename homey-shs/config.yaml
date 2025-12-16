@@ -1,0 +1,26 @@
+name: Homey Self-Hosted Server
+description: Run Homey Self-Hosted Server as a Home Assistant add-on
+version: "0.0.1"
+slug: homey-shs
+arch:
+  - amd64
+  - aarch64
+url: https://github.com/Doekse/homey-assistant
+init: false
+privileged:
+  - NET_ADMIN
+  - SYS_ADMIN
+  - SYS_RAWIO
+host_network: true
+startup: services
+boot: auto
+# No port mappings needed
+# Homey SHS uses these ports by default:
+#   - HTTP: 4899
+#   - HTTPS: 4868
+#   - Bridge V1: 4861
+#   - Bridge V2: 4842
+ports: {}
+# No directory mappings needed - using /data for persistence
+map: []
+
