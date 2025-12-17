@@ -1,7 +1,7 @@
 # Home Assistant Community Add-on: Homey Self-Hosted Server
 
 [![GitHub Release][releases-shield]][releases]
-[![License][license-shield]][../../LICENSE]
+[![License][license-shield]][../LICENSE]
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
@@ -16,7 +16,7 @@ Homey Self-Hosted Server is a software-only product based on the operating syste
 
 Out of the box, it supports devices that connect over Wi-Fi, Ethernet, Cloud, and Matter. Matter-over-Thread also works if you already have a Thread Border Router in your home. To add Zigbee, Z-Wave, Bluetooth LE, 433 MHz, or Infrared devices, simply connect a [Homey Bridge](https://homey.app/homey-bridge/) to unlock those wireless technologies — no USB sticks required.
 
-[:books: Read the full add-on documentation][docs]
+[Read the full add-on documentation][docs]
 
 ## Support
 

@@ -16,6 +16,13 @@ comparison to installing any other Home Assistant add-on.
 
    [![Open this add-on in your Home Assistant instance.][addon-badge]][addon]
 
+   **Note**: If Home Assistant can't find the add-on after adding the repository,
+   try the following:
+   - Go to **Settings** > **Add-ons** > **Add-on Store**
+   - Click the three-dot menu (⋮) in the top-right corner
+   - Select **Reload** to refresh the add-on store
+   - The add-on should then appear in the store
+
 2. Click the "Install" button to install the add-on.
 3. Start the "Homey Self-Hosted Server" add-on.
 4. Enjoy the add-on!

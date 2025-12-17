@@ -26,9 +26,10 @@ Got questions?
 
 You have several options to get them answered:
 
-You can also [open an issue here][issue] on GitHub
 - The Homey [Community Forum][forum] 
 - The Homey [Community Slack][slack]
+
+You can also [open an issue here][issue] on GitHub
 
 ## Authors & contributors
 
