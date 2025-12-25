@@ -42,20 +42,27 @@ Currently, this add-on does not require any additional configuration. The add-on
 
 The add-on persists its data automatically in the `/data` directory.
 
+### Web UI Access
+
+**Important**: Before accessing the web UI, you must first set up Homey Self-Hosted Server via the mobile app (see the [Installation](#installation) section above). After the initial setup, you need to create a local user to access the web UI. Detailed instructions for creating local users can be found in the [Homey support documentation](https://support.homey.app/hc/en-us/articles/22924537226268-Using-Local-Users-on-Homey-Pro).
+
+Once a local user has been created, access the Homey Self-Hosted Server web UI directly at `http://[HOST]:4859` where `[HOST]` is your Home Assistant host's IP address or hostname. You can also use the "Open web UI" button in the Home Assistant interface.
+
 ### Technical Details
 
 - **Docker Image**: `ghcr.io/athombv/homey-shs:latest`
 - **Network Mode**: Host networking (required for device discovery)
-- **Privileged Mode**: Enabled (required for hardware access)
+- **Privileged Mode**: Enabled (Homey Self-Hosted Server expects to run in Privileged mode)
 - **Data Directory**: `/data` (persisted automatically)
-
+- **Web UI**: Accessible at `http://[HOST]:4859` when the add-on is running
+- **Ingress**: Not supported (incompatible with host networking required for device discovery)
 ### Ports
 
 Homey Self-Hosted Server uses the following ports by default:
-- HTTP: 4899
-- HTTPS: 4868
+- HTTP: 4859
+- HTTPS: 4860
 - Bridge V1: 4861
-- Bridge V2: 4842
+- Bridge V2: 4862
 
 Since the add-on uses host networking, these ports are directly accessible on your local network.
 

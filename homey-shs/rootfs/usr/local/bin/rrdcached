@@ -1,0 +1,39 @@
+#!/bin/sh
+# Wrapper that intercepts rrdcached calls and modifies path arguments to avoid path resolution issues.
+
+# Locate the actual rrdcached binary by checking common installation paths
+REAL_RRDCACHED_BIN=$(which rrdcached 2>/dev/null || command -v rrdcached 2>/dev/null || echo "/usr/bin/rrdcached")
+for path in /usr/bin/rrdcached /usr/sbin/rrdcached /bin/rrdcached; do
+    if [ -f "$path" ]; then
+        REAL_RRDCACHED_BIN="$path"
+        break
+    fi
+done
+
+# Process command-line arguments, replacing problematic paths in the -b (base directory) argument
+NEW_ARGS=""
+i=1
+while [ $i -le $# ]; do
+    eval "arg=\${$i}"
+    if [ "$arg" = "-b" ] && [ $i -lt $# ]; then
+        i=$((i + 1))
+        eval "next_arg=\${$i}"
+        case "$next_arg" in
+            /homey/user/rrd|/homey/user/rrd/)
+                echo "[RRDCACHED WRAPPER] Replacing -b $next_arg with -b /data/rrd" >&2
+                NEW_ARGS="$NEW_ARGS -b /data/rrd"
+                ;;
+            *)
+                NEW_ARGS="$NEW_ARGS -b $next_arg"
+                ;;
+        esac
+    else
+        NEW_ARGS="$NEW_ARGS $arg"
+    fi
+    i=$((i + 1))
+done
+
+# Reconstruct argument list and execute the real binary with modified arguments
+set -- $NEW_ARGS
+exec "$REAL_RRDCACHED_BIN" "$@"
+
