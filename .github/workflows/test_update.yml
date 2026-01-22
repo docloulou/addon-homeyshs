@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run (no commit)"
+        description: "Dry run (no commit / tag / release)"
         required: true
         default: "true"
   schedule:
@@ -93,21 +93,30 @@ jobs:
         run: |
           echo "DRY_RUN = '${DRY_RUN}'"
           echo "Would bump add-on version from ${{ steps.addon.outputs.current_version }} to ${{ steps.ghcr.outputs.latest_tag }}"
-          echo "Would set image to ghcr.io/athombv/homey-shs:${{ steps.ghcr.outputs.latest_tag }}"
+          echo "Would update build.yaml build_from images to ghcr.io/athombv/homey-shs:${{ steps.ghcr.outputs.latest_tag }}"
           echo "Would prepend a changelog entry for version ${{ steps.ghcr.outputs.latest_tag }}"
+          echo "Would commit, tag and create a GitHub Release"
 
-      - name: Apply changes to config.yaml
+      - name: Apply changes to config.yaml and build.yaml
         if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
         run: |
           NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
 
-          # Update add-on version to match SHS version
+          echo "Updating config.yaml version to ${NEW_VERSION}..."
           yq -i ".version = \"${NEW_VERSION}\"" homey-shs/config.yaml
 
-          # Use the multi-arch manifest image (no {arch} suffix)
-          yq -i ".image = \"ghcr.io/athombv/homey-shs:${NEW_VERSION}\"" homey-shs/config.yaml
+          if [ -f homey-shs/build.yaml ]; then
+            echo "Updating build.yaml base images to SHS ${NEW_VERSION}..."
+            yq -i ".build_from.amd64 = \"ghcr.io/athombv/homey-shs:${NEW_VERSION}\"" homey-shs/build.yaml
+            yq -i ".build_from.aarch64 = \"ghcr.io/athombv/homey-shs:${NEW_VERSION}\"" homey-shs/build.yaml
 
-          echo "Updated homey-shs/config.yaml:"
+            echo "New build.yaml:"
+            cat homey-shs/build.yaml
+          else
+            echo "WARNING: homey-shs/build.yaml not found, skipping build_from update."
+          fi
+
+          echo "New config.yaml:"
           yq '.' homey-shs/config.yaml
 
       - name: Update CHANGELOG.md
@@ -136,7 +145,7 @@ jobs:
           tmpfile=$(mktemp)
           {
             # Header block (everything before the first '## [' line)
-            if [ "$HEADER_END" -gt 0 ]; then
+            if [ "$HEADER_END" > 0 ] 2>/dev/null; then
               head -n "$HEADER_END" "$FILE"
             fi
             echo ""
@@ -157,6 +166,25 @@ jobs:
           echo "New top of CHANGELOG.md:"
           head -n 20 "$FILE"
 
+      - name: Extract release notes from CHANGELOG
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
+        id: notes
+        run: |
+          NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
+          FILE="homey-shs/CHANGELOG.md"
+
+          # Extract the section for this version from the changelog
+          # Includes the "## [x.y.z]" header and its contents,
+          # stops when the next "## [" header is encountered.
+          awk -v ver="$NEW_VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1}
+            flag && $0 ~ "^## \\[" && $0 !~ "^## \\[" ver "\\]" {exit}
+            flag {print}
+          ' "$FILE" > RELEASE_NOTES.txt
+
+          echo "Release notes generated:"
+          cat RELEASE_NOTES.txt
+
       - name: Commit and push changes
         if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
         run: |
@@ -172,3 +200,30 @@ jobs:
 
           git commit -am "chore: bump Homey SHS add-on to ${NEW_VERSION}"
           git push
+
+      - name: Create and push git tag
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
+        run: |
+          NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
+
+          # Only create tag if it doesn't already exist
+          if git rev-parse "refs/tags/${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${NEW_VERSION} already exists, not creating a new one."
+            exit 0
+          fi
+
+          echo "Creating git tag ${NEW_VERSION}..."
+          git tag "${NEW_VERSION}"
+          git push origin "${NEW_VERSION}"
+
+      - name: Create GitHub Release
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.ghcr.outputs.latest_tag }}
+          release_name: Homey SHS add-on ${{ steps.ghcr.outputs.latest_tag }}
+          body_path: RELEASE_NOTES.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
