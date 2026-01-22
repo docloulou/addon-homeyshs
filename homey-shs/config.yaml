@@ -22,4 +22,3 @@ watchdog: http://[HOST]:[PORT:4859]
 ports: {}
 # No directory mappings needed - using /data for persistence
 map: []
-image: ghcr.io/athombv/homey-shs:12.11.1
