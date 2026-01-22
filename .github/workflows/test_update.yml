@@ -1,0 +1,82 @@
+name: Auto-bump Homey SHS add-on from GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no commit)"
+        required: true
+        default: "true"
+  # schedule:
+  #   - cron: '0 * * * *'
+
+jobs:
+  bump-from-ghcr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout addon repo
+        uses: actions/checkout@v4
+
+      - name: Install jq & yq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Get latest stable SHS tag from GHCR
+        id: ghcr
+        run: |
+          TAGS_JSON=$(curl -s https://ghcr.io/v2/athombv/homey-shs/tags/list)
+
+          TAGS=$(echo "$TAGS_JSON" | jq -r '.tags[]' 2>/dev/null || true)
+
+          SEMVER_TAGS=$(printf '%s\n' $TAGS | \
+            grep -Ev '^(latest|stable|beta)$' | \
+            grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
+
+          LATEST_TAG=$(printf '%s\n' $SEMVER_TAGS | sort -Vr | head -n1)
+
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Read current add-on version
+        id: addon
+        run: |
+          CURRENT_VERSION=$(yq '.version' homey-shs/config.yaml)
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Decide if bump is needed
+        id: decide
+        run: |
+          if [ "${{ steps.ghcr.outputs.latest_tag }}" = "${{ steps.addon.outputs.current_version }}" ]; then
+            echo "should_bump=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_bump=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show what WOULD change (dry run)
+        if: steps.decide.outputs.should_bump == 'true'
+        run: |
+          echo "Would bump add-on version from ${{ steps.addon.outputs.current_version }} to ${{ steps.ghcr.outputs.latest_tag }}"
+          echo "Would set image to ghcr.io/athombv/homey-shs-{arch}:${{ steps.ghcr.outputs.latest_tag }}"
+
+      - name: Apply changes
+        if: steps.decide.outputs.should_bump == 'true' && github.event.inputs.dry_run == 'false'
+        run: |
+          NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
+
+          yq -i ".version = \"${NEW_VERSION}\"" homey-shs/config.yaml
+          yq -i ".image = \"ghcr.io/athombv/homey-shs-{arch}:${NEW_VERSION}\"" homey-shs/config.yaml
+
+      - name: Commit and push changes
+        if: steps.decide.outputs.should_bump == 'true' && github.event.inputs.dry_run == 'false'
+        run: |
+          git config user.name "homey-shs-bot"
+          git config user.email "ci@homeyshs.local"
+
+          git commit -am "chore: bump Homey SHS add-on to ${{ steps.ghcr.outputs.latest_tag }}"
+          git push
