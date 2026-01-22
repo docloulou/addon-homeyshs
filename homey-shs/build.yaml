@@ -1,4 +1,3 @@
 build_from:
-  amd64: ghcr.io/athombv/homey-shs:latest
-  aarch64: ghcr.io/athombv/homey-shs:latest
-
+  amd64: ghcr.io/athombv/homey-shs:12.11.1
+  aarch64: ghcr.io/athombv/homey-shs:12.11.1
