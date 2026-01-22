@@ -1,4 +1,4 @@
-name: Auto-bump Homey SHS add-on from GHCR
+name: Auto-bump Homey SHS add-on
 
 on:
   workflow_dispatch:
@@ -7,8 +7,9 @@ on:
         description: "Dry run (no commit)"
         required: true
         default: "true"
-  # schedule:
-  #   - cron: '0 * * * *'
+  schedule:
+    # Runs once a day at 03:00 UTC
+    - cron: '0 3 * * *'
 
 jobs:
   bump-from-ghcr:
@@ -16,14 +17,18 @@ jobs:
     permissions:
       contents: write
 
+    # For scheduled runs, DRY_RUN defaults to "false"
+    # For manual runs, uses the provided input
+    env:
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+
     steps:
       - name: Checkout addon repo
         uses: actions/checkout@v4
 
-      - name: Install jq & yq
+      - name: Install yq
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y jq
           sudo wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
@@ -31,22 +36,19 @@ jobs:
       - name: Get latest stable SHS tag from GitHub HTML
         id: ghcr
         run: |
-          # Fetch the public HTML page that lists tagged versions
+          # Fetch the public HTML page that lists tagged container versions
           HTML=$(curl -s 'https://github.com/orgs/athombv/packages/container/homey-shs/versions?filters%5Bversion_type%5D=tagged')
-
-          # (Optional) Show a bit of it for debugging
-          echo "Snippet of versions page HTML:"
-          echo "$HTML" | head -n 40
 
           # Extract texts that look like pure semver tags from links:
           #   >12.11.1<  =>  12.11.1
-          TAGS=$(echo "$HTML" \
+          TAGS=$(printf '%s\n' "$HTML" \
             | grep -oE '>[0-9]+\.[0-9]+\.[0-9]+<' \
             | tr -d '><' \
             | sort -u)
 
           if [ -z "$TAGS" ]; then
             echo "No semver-looking tags (x.y.z) found in HTML."
+            echo "latest_tag=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -63,36 +65,110 @@ jobs:
         id: addon
         run: |
           CURRENT_VERSION=$(yq '.version' homey-shs/config.yaml)
+          echo "Current add-on version: $CURRENT_VERSION"
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Decide if bump is needed
         id: decide
         run: |
-          if [ "${{ steps.ghcr.outputs.latest_tag }}" = "${{ steps.addon.outputs.current_version }}" ]; then
+          LATEST="${{ steps.ghcr.outputs.latest_tag }}"
+          CURRENT="${{ steps.addon.outputs.current_version }}"
+
+          if [ -z "$LATEST" ]; then
+            echo "No latest tag resolved, skipping."
+            echo "should_bump=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Add-on already at latest SHS version ($CURRENT)."
             echo "should_bump=false" >> "$GITHUB_OUTPUT"
           else
+            echo "Add-on is outdated: $CURRENT -> $LATEST"
             echo "should_bump=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Show what WOULD change (dry run)
+      - name: Show what WOULD change
         if: steps.decide.outputs.should_bump == 'true'
         run: |
+          echo "DRY_RUN = '${DRY_RUN}'"
           echo "Would bump add-on version from ${{ steps.addon.outputs.current_version }} to ${{ steps.ghcr.outputs.latest_tag }}"
-          echo "Would set image to ghcr.io/athombv/homey-shs-{arch}:${{ steps.ghcr.outputs.latest_tag }}"
+          echo "Would set image to ghcr.io/athombv/homey-shs:${{ steps.ghcr.outputs.latest_tag }}"
+          echo "Would prepend a changelog entry for version ${{ steps.ghcr.outputs.latest_tag }}"
 
-      - name: Apply changes
-        if: steps.decide.outputs.should_bump == 'true' && github.event.inputs.dry_run == 'false'
+      - name: Apply changes to config.yaml
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
         run: |
           NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
 
+          # Update add-on version to match SHS version
           yq -i ".version = \"${NEW_VERSION}\"" homey-shs/config.yaml
-          yq -i ".image = \"ghcr.io/athombv/homey-shs-{arch}:${NEW_VERSION}\"" homey-shs/config.yaml
+
+          # Use the multi-arch manifest image (no {arch} suffix)
+          yq -i ".image = \"ghcr.io/athombv/homey-shs:${NEW_VERSION}\"" homey-shs/config.yaml
+
+          echo "Updated homey-shs/config.yaml:"
+          yq '.' homey-shs/config.yaml
+
+      - name: Update CHANGELOG.md
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
+        run: |
+          NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
+          TODAY=$(date -u +%Y-%m-%d)
+          FILE="homey-shs/CHANGELOG.md"
+
+          echo "Updating changelog ${FILE} for version ${NEW_VERSION}..."
+
+          # Ensure file ends with a newline
+          sed -i -e '$a\' "$FILE"
+
+          # Find the first version heading line (starts with '## [')
+          VERSION_LINE=$(grep -n '^## \[' "$FILE" | head -n1 | cut -d: -f1 || true)
+
+          if [ -z "$VERSION_LINE" ]; then
+            # No existing versions, treat whole file as header
+            HEADER_END=$(wc -l < "$FILE")
+          else
+            # Header is everything before the first version line
+            HEADER_END=$((VERSION_LINE - 1))
+          fi
+
+          tmpfile=$(mktemp)
+          {
+            # Header block (everything before the first '## [' line)
+            if [ "$HEADER_END" -gt 0 ]; then
+              head -n "$HEADER_END" "$FILE"
+            fi
+            echo ""
+            # New entry for the latest SHS version
+            echo "## [${NEW_VERSION}] - ${TODAY}"
+            echo "### Changed"
+            echo "- Updated Homey Self-Hosted Server base image to version ${NEW_VERSION}"
+            echo "- You can check out the Homey Self-Hosted Server changelog here: https://homey.app/en-us/wiki/homey-shs-changelog/"
+            echo ""
+            # Existing entries (from the first version heading onwards)
+            if [ -n "$VERSION_LINE" ]; then
+              tail -n +"$VERSION_LINE" "$FILE"
+            fi
+          } > "$tmpfile"
+
+          mv "$tmpfile" "$FILE"
+
+          echo "New top of CHANGELOG.md:"
+          head -n 20 "$FILE"
 
       - name: Commit and push changes
-        if: steps.decide.outputs.should_bump == 'true' && github.event.inputs.dry_run == 'false'
+        if: steps.decide.outputs.should_bump == 'true' && env.DRY_RUN == 'false'
         run: |
+          NEW_VERSION="${{ steps.ghcr.outputs.latest_tag }}"
+
           git config user.name "homey-shs-bot"
           git config user.email "ci@homeyshs.local"
 
-          git commit -am "chore: bump Homey SHS add-on to ${{ steps.ghcr.outputs.latest_tag }}"
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -am "chore: bump Homey SHS add-on to ${NEW_VERSION}"
           git push
