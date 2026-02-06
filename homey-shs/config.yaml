@@ -20,4 +20,5 @@ watchdog: http://[HOST]:[PORT:4859]
 #   - Bridge V1: 4861
 #   - Bridge V2: 4862
 ports: {}
-addon_config: true
+map:
+  - addon_config:rw
