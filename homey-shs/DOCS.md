@@ -40,7 +40,17 @@ After starting the add-on:
 
 Currently, this add-on does not require any additional configuration. The add-on uses host networking mode by default, which means Homey Self-Hosted Server will be accessible on your local network. The server should automatically be discoverable by the Homey mobile app.
 
-The add-on persists its data automatically in the `/data` directory.
+The add-on persists its data automatically in the `/addon_configs` directory (specifically `/addon_configs/homey-shs` or similar depending on the add-on slug).
+
+### Backups & SSH Access
+
+By storing data in `/addon_configs`, the Homey user data (`/homey/user`) becomes easily accessible via the official **Terminal & SSH** add-on for Home Assistant.
+
+This facilitates manual backups and data management. You can access your Homey data at:
+- Host path: `/addon_configs/<addon_slug>/`
+- Internal container path: `/config`
+
+This allows you to easily backup your Homey data using standard Linux tools from the SSH terminal.
 
 ### Web UI Access
 
@@ -53,7 +63,7 @@ Once a local user has been created, access the Homey Self-Hosted Server web UI d
 - **Docker Image**: `ghcr.io/athombv/homey-shs:latest`
 - **Network Mode**: Host networking (required for device discovery)
 - **Privileged Mode**: Enabled (Homey Self-Hosted Server expects to run in Privileged mode)
-- **Data Directory**: `/data` (persisted automatically)
+- **Data Directory**: `/addon_configs` (mapped to `/config` internally)
 - **Web UI**: Accessible at `http://[HOST]:4859` when the add-on is running
 - **Ingress**: Not supported (incompatible with host networking required for device discovery)
 ### Ports

@@ -8,6 +8,13 @@
 
 Run Homey Self-Hosted Server as a Home Assistant add-on.
 
+## ℹ️ Fork Information
+
+**This fork allows SSH access to your data.**
+
+Unlike the original add-on which stores data in the internal `/data` volume, this version persists data in `/addon_configs` (mapped to `/config` internally). This makes your Homey user data accessible via the standard **Terminal & SSH** add-on in Home Assistant, enabling easier manual backups and file access.
+
+
 ## About
 
 This add-on allows you to run [Homey Self-Hosted Server](https://homey.app) within your Home Assistant OS installation.
