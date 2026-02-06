@@ -20,8 +20,8 @@ while [ $i -le $# ]; do
         eval "next_arg=\${$i}"
         case "$next_arg" in
             /homey/user/rrd|/homey/user/rrd/)
-                echo "[RRDCACHED WRAPPER] Replacing -b $next_arg with -b /data/rrd" >&2
-                NEW_ARGS="$NEW_ARGS -b /data/rrd"
+                echo "[RRDCACHED WRAPPER] Replacing -b $next_arg with -b /config/rrd" >&2
+                NEW_ARGS="$NEW_ARGS -b /config/rrd"
                 ;;
             *)
                 NEW_ARGS="$NEW_ARGS -b $next_arg"

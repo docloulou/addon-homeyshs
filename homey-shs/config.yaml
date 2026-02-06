@@ -20,5 +20,4 @@ watchdog: http://[HOST]:[PORT:4859]
 #   - Bridge V1: 4861
 #   - Bridge V2: 4862
 ports: {}
-# No directory mappings needed - using /data for persistence
-map: []
+addon_config: true

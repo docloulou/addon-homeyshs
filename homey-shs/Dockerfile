@@ -2,7 +2,7 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # Copy entrypoint wrapper that configures persistent storage before application startup.
-# The wrapper creates a symlink from /homey/user to /data to map the application's expected
+# The wrapper creates a symlink from /homey/user to /config to map the application's expected
 # data location to Home Assistant's persistent storage directory.
 COPY rootfs/usr/local/bin/entrypoint-wrapper.sh /usr/local/bin/entrypoint-wrapper.sh
 RUN chmod a+x /usr/local/bin/entrypoint-wrapper.sh

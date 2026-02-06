@@ -1,6 +1,6 @@
 #!/bin/sh
 # Entrypoint wrapper that configures persistent storage before starting the application.
-# Home Assistant mounts persistent data at /data, but the application expects /homey/user.
+# Home Assistant mounts persistent data at /config, but the application expects /homey/user.
 
 echo "========================================="
 echo "Setting up Homey Self-Hosted Server environment..."
@@ -8,47 +8,47 @@ echo "========================================="
 
 echo "[INFO] Setting up persistent storage..."
 
-mkdir -p /data /homey
-mkdir -p /data/rrd
+mkdir -p /config /homey
+mkdir -p /config/rrd
 
-# Create symlink from /homey/user to /data to map the application's expected data location
+# Create symlink from /homey/user to /config to map the application's expected data location
 # to Home Assistant's persistent storage directory. Handles migration from previous versions
 # where /homey/user may have been a directory instead of a symlink.
 if [ -L "/homey/user" ]; then
     TARGET=$(readlink -f /homey/user 2>/dev/null || readlink /homey/user 2>/dev/null || echo "")
-    if [ "$TARGET" = "/data" ]; then
-        echo "[INFO] Symlink /homey/user -> /data already exists"
+    if [ "$TARGET" = "/config" ]; then
+        echo "[INFO] Symlink /homey/user -> /config already exists"
     else
         echo "[INFO] Removing incorrect symlink and creating new one"
         rm -f /homey/user
-        ln -sf /data /homey/user
-        echo "[INFO] Created symlink /homey/user -> /data"
+        ln -sf /config /homey/user
+        echo "[INFO] Created symlink /homey/user -> /config"
     fi
 elif [ -d "/homey/user" ] && ! mountpoint -q /homey/user 2>/dev/null; then
     # Backward compatibility: migrate data from directory-based storage to symlink-based storage
-    if [ "$(ls -A /homey/user 2>/dev/null)" ] && [ ! "$(ls -A /data 2>/dev/null)" ]; then
-        echo "[INFO] Migrating data from /homey/user to /data..."
-        cp -a /homey/user/. /data/ 2>/dev/null || true
+    if [ "$(ls -A /homey/user 2>/dev/null)" ] && [ ! "$(ls -A /config 2>/dev/null)" ]; then
+        echo "[INFO] Migrating data from /homey/user to /config..."
+        cp -a /homey/user/. /config/ 2>/dev/null || true
     fi
     rm -rf /homey/user
-    ln -sf /data /homey/user
-    echo "[INFO] Created symlink /homey/user -> /data"
+    ln -sf /config /homey/user
+    echo "[INFO] Created symlink /homey/user -> /config"
 elif [ ! -e "/homey/user" ]; then
-    ln -sf /data /homey/user
-    echo "[INFO] Created symlink /homey/user -> /data"
+    ln -sf /config /homey/user
+    echo "[INFO] Created symlink /homey/user -> /config"
 fi
 
-if [ ! -d "/data/rrd" ]; then
-    mkdir -p /data/rrd
-    echo "[INFO] Created /data/rrd directory"
+if [ ! -d "/config/rrd" ]; then
+    mkdir -p /config/rrd
+    echo "[INFO] Created /config/rrd directory"
 fi
 
-# Verify that /data is mounted by Home Assistant to ensure persistence works
-if mountpoint -q /data 2>/dev/null; then
-    DATA_SOURCE=$(findmnt -n -o SOURCE /data 2>/dev/null || echo "")
-    echo "[INFO] /data is mounted from: $DATA_SOURCE"
+# Verify that /config is mounted by Home Assistant to ensure persistence works
+if mountpoint -q /config 2>/dev/null; then
+    DATA_SOURCE=$(findmnt -n -o SOURCE /config 2>/dev/null || echo "")
+    echo "[INFO] /config is mounted from: $DATA_SOURCE"
 else
-    echo "[WARN] /data is NOT a mount point - this might indicate an issue with Home Assistant's persistent storage"
+    echo "[WARN] /config is NOT a mount point - this might indicate an issue with Home Assistant's persistent storage"
 fi
 
 # Verify symlink functionality and write permissions before starting the application
@@ -64,8 +64,8 @@ if [ -L "/homey/user" ]; then
     fi
 fi
 
-echo "[INFO] Contents of /data:"
-ls -la /data/ 2>/dev/null | head -10 || echo "  /data is empty or not accessible"
+echo "[INFO] Contents of /config:"
+ls -la /config/ 2>/dev/null | head -10 || echo "  /config is empty or not accessible"
 
 echo "[INFO] Persistent storage setup complete"
 echo "========================================="
